@@ -1,5 +1,6 @@
 import Keyboard
 import Window
+import Time exposing (every, second)
 import List exposing (head, tail, take, drop, length)
 import Maybe exposing (withDefault)
 import Graphics.Element exposing (image, container, middle, Element)
@@ -12,35 +13,35 @@ pointPlace = 15
 
 
 --Models
-type alias Snake = List Dot
-type Dot = Colinear Point | Corner Dir Point
+type alias Snake = (List Dot)
+type Dot = D Dir Point
+
 type alias Point = {x: Int, y: Int}
 type Dir = Up | Down | Left | Right
 
-theSnake = [Colinear {x=0, y= 0}, Colinear {x = 1, y = 0}, Corner Up {x = 2, y =0},
-            Colinear {x=2, y = 1}, Colinear {x=2, y =2}]
-
-turn : Dir -> Point -> Point
-turn dir p = 
-  case dir of
-    Up ->  {p | y <- p.y + 1}
-    Down -> {p | y <- p.y - 1}
-    Left -> {p | x <- p.x - 1}
-    Right -> {p | x <- p.x + 1}
+initSnake = [D Right {x= -1, y =0}, D Right {x=0, y= 0}, D Right {x = 1, y = 0}, D Up {x = 2, y =0},
+           D Up {x=2, y = 1}, D Up {x=2, y =2}, D Up {x=2, y =3}]
 
 
 --Update
+scooch : Dir -> Point -> Dot
+scooch dir p = 
+  case dir of
+    Up -> D dir {p | y <- p.y + 1}
+    Down -> D dir {p | y <- p.y - 1}
+    Left -> D dir {p | x <- p.x - 1}
+    Right -> D dir {p | x <- p.x + 1}
+
+
+
 slither : Snake -> Snake
 slither snake = 
-  let front = withDefault (Colinear {x=0, y=0}) (head snake)
+  let front = withDefault (D Up {x=0, y=0}) (head snake)
       middle = take (length snake - 2) (withDefault ([]) (tail snake))
-      back = withDefault (Colinear {x=0, y=0}) (head (drop (length snake - 1) snake))
+      back = withDefault (D Up {x=0, y=0}) (head (drop (length snake - 1) snake))
   in
-      case front of 
-        Corner dir p ->
-            [Colinear (turn dir p)] ++ middle
-        Colinear p ->
-            snake
+     case front of
+       D dir p -> [scooch dir p] ++ [front] ++ middle
 
 
 --View
@@ -53,15 +54,13 @@ drawDot dot =
                       |> move (makePoint p)
   in
       case dot of 
-        Colinear p ->
+        D dir p ->
                 drawPoint lightRed p
-        Corner dir p ->
-                drawPoint darkRed p
 
 
 drawSnake snake = List.map drawDot snake
 
 display snake = collage 500 500 (drawSnake snake)
-  
 
-main  = display theSnake
+
+main  = display initSnake
