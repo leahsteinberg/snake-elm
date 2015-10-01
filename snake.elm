@@ -1,5 +1,6 @@
 import Keyboard
 import Window
+import Signal exposing (map, foldp)
 import Time exposing (every, second)
 import List exposing (head, tail, take, drop, length)
 import Maybe exposing (withDefault)
@@ -19,8 +20,8 @@ type Dot = D Dir Point
 type alias Point = {x: Int, y: Int}
 type Dir = Up | Down | Left | Right
 
-initSnake = [D Right {x= -1, y =0}, D Right {x=0, y= 0}, D Right {x = 1, y = 0}, D Up {x = 2, y =0},
-           D Up {x=2, y = 1}, D Up {x=2, y =2}, D Up {x=2, y =3}]
+initSnake = [D Left {x= -1, y =0}, D Left {x=0, y= 0}, D Left {x = 1, y = 0}, D Down {x = 2, y =0},
+           D Down {x=2, y = 1}, D Down {x=2, y =2}, D Down {x=2, y =3}]
 
 
 --Update
@@ -61,6 +62,6 @@ drawDot dot =
 drawSnake snake = List.map drawDot snake
 
 display snake = collage 500 500 (drawSnake snake)
-
-
-main  = display initSnake
+-- fold p: (a -> state -> state) -> initState -> Signal a -> Signal State
+x = foldp (\tick snake -> slither snake) initSnake (every second)
+main  = map display (foldp (\tick snake -> slither snake) initSnake (every second))
