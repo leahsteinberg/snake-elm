@@ -1,7 +1,7 @@
 import Keyboard exposing (arrows)
 import Window
 import Signal exposing (map, foldp, merge)
-import Time exposing (every, second, Time)
+import Time exposing (every, second, Time, fps)
 import List exposing (head, tail, take, drop, length)
 import Maybe exposing (withDefault)
 import Graphics.Element exposing (image, container, middle, Element)
@@ -47,20 +47,22 @@ slither snake =
      case front of
        D dir p -> [scooch dir p] ++ [front] ++ middle
 
---moveSnake : Update -> Snake -> Snake
---move update snake = 
---  case update of
---      Tick t -> slither snake
---      Arrow dir -> turn dir snake
+moveSnake : Update -> Snake -> Snake
+moveSnake update snake = 
+  case update of
+      Tick t -> slither snake
+      Arrow dir -> turn dir snake
 
---turn : {x: Int, y: Int} -> Snake -> Snake
---turn dir snake = 
---  let front = withDefault (D Up {x=0, y=0}) (head snake)
---      body =  (withDefault ([]) (tail snake))
---  in
---     snake
---     case front of
---       D dir point -> [D ]
+
+--need a function where if you 
+
+turn : {x: Int, y: Int} -> Snake -> Snake
+turn arrowDir snake = 
+    let front = withDefault (D up {x=0, y=0}) (head snake)
+        body =  (withDefault ([]) (tail snake))
+    in
+     case front of
+       D dir point -> [D arrowDir point] ++ body -- should not turn if it's the opposite direction!!!!
 
 
 
@@ -80,16 +82,26 @@ drawDot dot =
 
 type Update = Tick Time | Arrow Dir
 
---updates : Signal Update
---updates =
---    merge
---    (map Tick (every second))
---    (map Arrow arrows)
+isDirectionArrow : Dir -> Bool
+isDirectionArrow dir = 
+  if dir.x == 0 && dir.y == 0 then False else True
+
+
+
+updates : Signal Update
+updates =
+    let
+        delta = map (\t -> t/20) (fps 12)
+    in
+        merge
+        (map Tick (every second))
+        (map Arrow (Signal.filter isDirectionArrow up (Signal.sampleOn delta Keyboard.arrows) )  ) 
+
 
 
 drawSnake snake = List.map drawDot snake
 
-display snake = collage 500 500 (drawSnake snake)
+display snake = collage 700 700 (drawSnake snake)
 -- fold p: (a -> state -> state) -> initState -> Signal a -> Signal State
 --x = foldp (\tick snake -> slither snake) initSnake (every second)
-main  = map display (foldp (\change snake -> slither snake) initSnake (every second))
+main = map display (foldp (\update snake -> moveSnake update snake) initSnake updates)
