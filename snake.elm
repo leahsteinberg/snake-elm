@@ -32,7 +32,7 @@ initFood = {x=10, y=10}
 initSnake = [D left {x= -1, y =0}, D left {x=0, y= 0}, D left {x = 1, y = 0}, D down {x = 2, y =0},
            D down {x=2, y = 1}, D down {x=2, y =2}, D down {x=2, y =3}]
 
-
+initState = (initFood, initSnake)
 --Update
 wrap : Int -> Int
 wrap coord =
@@ -51,11 +51,13 @@ getDir dot =
   case dot of
     D dir p -> dir
 
+collides : Point -> Point -> Bool
+collides point1 point2 = if point1.x == point2.x && point1.y == point2.y then True else False
 
-checkCollide : Dot -> Snake -> Bool
-checkCollide dot snake =
-  let collides point1 point2 = if point1.x == point2.x && point1.y == point2.y then True else False
-  in
+
+
+eatsOwnTail : Dot -> Snake -> Bool
+eatsOwnTail dot snake =
      case dot of
        D newDot newP ->
          foldr (\snakeDot accum -> if not accum then accum else not (collides newP (getPoint snakeDot))) True snake
@@ -68,9 +70,26 @@ scooch dir p =
   in
       D dir {x = newX, y = newY}
 
+nibble : Food -> Dot -> Dot -> Snake -> Snake
+nibble food newDot front middle =
+    case newDot of 
+      D dir point -> if collides point food then 
+        let 
+            back = withDefault (D up {x=0, y=0}) (head (drop (length middle - 1) middle))
+        in
+           case back of
+             D backDir backPoint ->
+                let newX = wrap (backPoint.x - backDir.x)
+                    newY = wrap (backPoint.y - backDir.y)
+                in
+                    [newDot] ++ [front] ++ middle ++ [D backDir {x = newX, y = newY}]
+        else [newDot] ++ [front] ++ middle
 
-slither : Snake -> Snake
-slither snake =
+
+
+
+slither : Food -> Snake -> State
+slither food snake =
   let front = withDefault (D up {x=10, y=10}) (head snake)
       middle = take (length snake - 2) (withDefault ([]) (tail snake))
       back = withDefault (D up {x=0, y=0}) (head (drop (length snake - 1) snake))
@@ -78,8 +97,9 @@ slither snake =
      case front of
        D dir p ->
          let newDot = scooch dir p
+             newSnake = nibble food newDot front middle
          in
-            if checkCollide newDot middle then [newDot] ++ [front] ++ middle else []
+            if eatsOwnTail newDot middle then ({x= -10, y=-10},  newSnake) else (food, [])
 
 
 turn : {x: Int, y: Int} -> Snake -> Snake
@@ -97,11 +117,13 @@ noBackwards arrow head =
        |arrow.y == 0 && head.y == 0 -> head
        |otherwise -> arrow
 
-moveSnake : Update -> Snake -> Snake
-moveSnake update snake =
-  case update of
-      Tick t -> slither snake
-      Arrow dir -> turn dir snake
+moveSnake : Update -> State -> State
+moveSnake update state =
+  case state of
+    (food, snake) -> 
+      case update of
+          Tick t -> slither food snake
+          Arrow dir -> (food, turn dir snake)
 
 
 --View
@@ -144,8 +166,11 @@ updates =
 
 drawSnake snake = List.map drawSnakeDot snake
 
-display snake = collage (gridDimension * pointPlace) (gridDimension * pointPlace) ([drawPoint darkRed initFood] ++ (drawSnake snake))
-main = map display (foldp (\update snake -> moveSnake update snake) initSnake updates)
+display state = 
+  case state of 
+    (food, snake) ->
+  collage (gridDimension * pointPlace) (gridDimension * pointPlace) ([drawPoint darkRed initFood] ++ (drawSnake snake))
+main = map display (foldp (\update state -> moveSnake update state) initState updates)
 
 
 
