@@ -16,25 +16,27 @@ type alias Vertebra = {point: Point, dir: Dir}
 type alias Point = {x: Int, y: Int}
 type alias Dir = {x: Int, y: Int}
 type alias Food = Point
-type alias State = {food: Food, snake: Snake}
+type alias State = (Food, Snake)
+
   
 type Update = Tick Time | Arrow Dir
 
 pointDim = 10
 pointOffset = 15
-gridDimension = 46
-defaultVert = {point= {x=0, y=0}, dir: {x=1, y =0}}
+gridDim = 46
+defaultVert = {point= {x=0, y=0}, dir= {x=1, y =0}}
+upArrow = {x=0, y =1}
+
 initFood = {x= 5, y = 5}
 
 initSnake = [
   {point= {x= -1, y=0}, dir= {x= -1, y= 0}}
   ,{point= {x= 0, y=0}, dir= {x= -1, y= 0}}
   ,{point= {x= 1, y=0}, dir= {x= -1, y= 0}}
-  ,{point= {x= 1, y:=1}, dir= {x= 0, y= -1}}
+  ,{point= {x= 1, y=1}, dir= {x= 0, y= -1}}
   ,{point= {x= 1, y=2}, dir= {x= 0, y= -1}}
   ,{point= {x= 1, y=3}, dir= {x= 0, y= -1}}
-  ,{point= {x= 2, y=3}, dir= {x= -1, y= 0}}
-]
+  ,{point= {x= 2, y=3}, dir= {x= -1, y= 0}}]
 
 initState = (initFood, initSnake)
 
@@ -43,9 +45,9 @@ getFront : Snake -> Vertebra
 getFront snake = withDefault defaultVert (head snake)
 
 getBack : Snake -> Vertebra
-getBack snake = withDefault defaultVert (head (drop (length snake -1) snake))
+getBack snake = withDefault defaultVert (head (drop ((length snake) - 1) snake))
 
-getMiddle : Snake -> Vertebra
+getMiddle : Snake -> Snake
 getMiddle snake = take (length snake - 2) (withDefault [] (tail snake))
 
 getBody : Snake -> Snake
@@ -53,16 +55,21 @@ getBody snake = withDefault [] (tail snake)
 
 wrap : Int -> Int
 wrap coord =
-  if |coord < -gridDimension // 2 -> gridDimension //2
-     |coord >= gridDimension // 2 -> -gridDimension // 2
-     |otherwise -> coord
+  let maxDim = gridDim // 2
+  in
+      if |coord < -maxDim -> maxDim
+         |coord >= maxDim -> -maxDim
+         |otherwise -> coord
 
 noBackwards : Dir -> Vertebra -> Dir
 noBackwards arrowDir vert =
-  if |arrowDir.x == 0 && vert.dir.x == 0 -> {x = 0, y = 0}
-     |arrowDir.y == 0 && vert.dir.y == 0 -> {x = 0, y = 0}
+  if |arrowDir.x == 0 && vert.dir.x == 0 -> vert.dir
+     |arrowDir.y == 0 && vert.dir.y == 0 -> vert.dir
      |otherwise -> arrowDir
-  
+
+newFood : Food
+
+
 -- Update
 
 updates : Signal Update
@@ -73,43 +80,80 @@ updates =
   in
      merge
      (map Tick (every second))
-     (map Arrow (filter isDirectionArrow up (sampleOn delta arrows)))
+     (map Arrow (filter isDirectionArrow upArrow (sampleOn delta arrows)))
 
 updateState : Update -> State -> State
 updateState update state = 
-  case update of
-    Tick s -> slither state
-    Arrow dir -> {state | snake <- turn dir snake}
+  let (food, snake) = state
+  in
+      case update of
+        Tick s -> slither state
+        Arrow dir -> (food, turn dir snake)
 
 slither : State -> State
 slither state =
-  let newVert = scooch (getFront state.snake)
+  let (food, snake) = state
+      newVert = scooch (getFront snake)
+      snakeMiddle = getMiddle snake
   in
-     if (eatsOwnTail newVert snake) then {state | snake <- []} else nibble {state | snake <- [newVert] ++ snake}
+     if (eatsOwnTail newVert snake) then (food, []) else nibble (food, [newVert] ++ [getFront snake] ++ snakeMiddle)
 
 turn : Dir -> Snake -> Snake
 turn arrowDir snake =
   let correctedDir = noBackwards arrowDir (getFront snake)
+      front = getFront snake
   in
-      [{getFront snake | dir <- correctedDir}] ++ (getBody snake)
+      [{front | dir <- correctedDir}] ++ (getBody snake)
+
+
+
+addTail : Snake -> Snake
+addTail snake = 
+  let back = getBack snake
+      newBack = {back | point <- {x = back.point.x - back.dir.x, y = back.point.y - back.dir.y}}
+  in
+     snake ++ [newBack]
+
 
 scooch : Vertebra -> Vertebra
 scooch front = 
   {
-    point = {x =front.point.x + front.dir.x, y = front.point.y + front.dir.y},
+    point = {x = front.point.x + front.dir.x, y = front.point.y + front.dir.y},
     dir = front.dir
   }
 
 
+chomp : {a | x: Int, y: Int} -> {a | x: Int, y: Int} -> Bool
+chomp fangs morsel = fangs.x == morsel.x && fangs.y == morsel.y
+
 eatsOwnTail : Vertebra -> Snake -> Bool
+eatsOwnTail newVert snake =
+  let oldSnake = [getFront snake] ++ (getMiddle snake)
+  in
+     foldr (\ vert accum -> if chomp newVert.point vert.point then True else accum) False oldSnake
+
 
 nibble : State -> State
-
+nibble state = 
+  let (food, snake) = state
+      frontVert = getFront snake
+  in
+     if chomp food frontVert.point then (newFood, addTail snake) else (food, snake)
 
 -- View
 
+drawPoint : Color -> {a | x: Int, y: Int} -> Form
+drawPoint color point = rect pointDim pointDim
+                          |> filled color
+                          |> move (toFloat point.x * pointOffset, toFloat point.y * pointOffset)
 
+displayState : State -> Element
+displayState state =
+  let (food, snake) = state
+      pixelDim = gridDim * pointOffset
+  in 
+     collage pixelDim pixelDim ([drawPoint darkRed food] ++ (List.map (\vert -> (drawPoint lightRed) vert.point) snake))
 
-main = map displaySnake (foldp (\update state -> updateState update state) initState updates)
+main = map displayState (foldp (\update state -> updateState update state) initState updates)
 
 
