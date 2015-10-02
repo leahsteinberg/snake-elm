@@ -22,7 +22,7 @@ type Update = Tick Time | Arrow Dir
 
 pointDim = 10
 pointOffset = 15
-gridDim = 46
+gridDim = 44
 defaultVert = {point= {x=0, y=0}, dir= {x=1, y =0}}
 upArrow = {x=0, y =1}
 initFood = {x= 5, y = 5}
@@ -37,9 +37,6 @@ initSnake = [
   ,{point= {x= 1, y=3}, dir= {x= 0, y= -1}}
   ,{point= {x= 2, y=3}, dir= {x= -1, y= 0}}]
 
---initSe = int -13 13
-s : Int -> Seed
-s nnnn= initialSeed 5
 
 initState = (initFood, initSnake, initialSeed 5)
 
@@ -60,8 +57,8 @@ wrap : Int -> Int
 wrap coord =
   let maxDim = gridDim // 2
   in
-      if |coord < -maxDim -> maxDim
-         |coord >= maxDim -> -maxDim
+      if |coord < -gridDim // 2 -> gridDim // 2
+         |coord >= gridDim //2 -> -gridDim //2
          |otherwise -> coord
 
 noBackwards : Dir -> Vertebra -> Dir
@@ -81,7 +78,7 @@ updates =
       isDirectionArrow dir = if dir.x == 0 && dir.y == 0 then False else True
   in
      merge
-     (map Tick (every second))
+     (map Tick (fps 5))
      (map Arrow (filter isDirectionArrow upArrow (sampleOn delta arrows)))
 
 updateState : Update -> State -> State
@@ -121,7 +118,7 @@ addTail snake =
 scooch : Vertebra -> Vertebra
 scooch front =
   {
-    point = {x = front.point.x + front.dir.x, y = front.point.y + front.dir.y},
+    point = {x = wrap (front.point.x + front.dir.x), y = wrap(front.point.y + front.dir.y)},
     dir = front.dir
   }
 
@@ -142,7 +139,7 @@ digest state =
       (newerInt, newerSeed) = generate (int -13 13) newSeed
       newFood = {x = newInt, y = newerInt}
   in
-     if not (pointOnSnake newFood snake) then (newFood, snake, newerSeed) else digest (food, snake, newerSeed)
+     if not (pointOnSnake newFood snake) then (newFood, addTail snake, newerSeed) else digest (food, snake, newerSeed)
 
 
 nibble : State -> State
