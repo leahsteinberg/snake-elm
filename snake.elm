@@ -27,7 +27,7 @@ type alias Dir = {x: Int, y: Int}--Up | Down | Left | Right
 type alias Food = {x: Int, y: Int}
 type alias State = (Food, Snake)
 
-initFood = {x=10, y=10}
+initFood = {x=5, y=5}
 
 initSnake = [D left {x= -1, y =0}, D left {x=0, y= 0}, D left {x = 1, y = 0}, D down {x = 2, y =0},
            D down {x=2, y = 1}, D down {x=2, y =2}, D down {x=2, y =3}]
@@ -75,15 +75,15 @@ nibble food newDot front middle =
     case newDot of 
       D dir point -> if collides point food then 
         let 
-            back = withDefault (D up {x=0, y=0}) (head (drop (length middle - 1) middle))
+            back = withDefault (D up {x=-10, y=0}) (head (drop (length middle - 1) middle))
         in
            case back of
              D backDir backPoint ->
-                let newX = wrap (backPoint.x - backDir.x)
-                    newY = wrap (backPoint.y - backDir.y)
+                let newX = 13--wrap (backPoint.x - backDir.x)
+                    newY = 13--wrap (backPoint.y - backDir.y)
                 in
                     [newDot] ++ [front] ++ middle ++ [D backDir {x = newX, y = newY}]
-        else [newDot] ++ [front] ++ middle
+        else [newDot] ++ [front]  ++ middle
 
 
 
